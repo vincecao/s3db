@@ -1,6 +1,6 @@
 {
   "name": "@vincecao/s3db",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Turn s3 into a basic database",
   "main": "dist/index.js",
   "scripts": {
