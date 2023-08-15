@@ -1,0 +1,40 @@
+{
+  "name": "@vincecao/s3db",
+  "version": "0.0.2",
+  "description": "Turn s3 into a basic database",
+  "main": "dist/index.js",
+  "scripts": {
+    "prepublish": "npx tsc",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vincecao/s3db.git"
+  },
+  "keywords": [
+    "S3",
+    "Database"
+  ],
+  "author": "Lineng Cao",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/vincecao/s3db/issues"
+  },
+  "homepage": "https://github.com/vincecao/s3db#readme",
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.391.0",
+    "@aws-sdk/s3-request-presigner": "^3.391.0",
+    "tiny-invariant": "^1.3.1",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "20.5.0",
+    "@types/uuid": "^9.0.2",
+    "typescript": "5.1.6"
+  },
+  "babel": {
+    "presets": [
+      "es2015"
+    ]
+  }
+}
