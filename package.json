@@ -4,7 +4,7 @@
   "description": "Turn s3 into a basic database",
   "main": "dist/index.js",
   "scripts": {
-    "prepublish": "npx tsc",
+    "prepublishOnly": "npx tsc",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
