@@ -1,1 +1,1 @@
-export { S3db as default } from "./s3db";
+export { S3db as default, getS3dbConfigFromEnv } from "./s3db";
