@@ -26,6 +26,7 @@ const streamToString = (stream: Readable) =>
 
 type S3dbDocument<T> = {
   id: string;
+  order: number;
 } & T;
 
 export class S3db<T extends object> extends S3 {
@@ -161,16 +162,16 @@ export class S3db<T extends object> extends S3 {
     });
   }
 
-  async uploadDBDocumentWithMedia(document: T | S3dbDocument<T>, media?: File[]): Promise<string> {
+  async uploadDBDocumentWithMedia(document: T | S3dbDocument<T>, media: File[]): Promise<string> {
     invariant(this.collectionName, "Invalid collectionName");
     const id = await this.uploadDBDocument(document);
-    if (media) await this.uploadDBDocumentMedia(id, media);
+    await this.uploadDBDocumentMedia(id, media);
     return id;
   }
 
   async uploadDBDocument(document: T | S3dbDocument<T>): Promise<string> {
     let id = uuid();
-    if (!("id" in document)) {
+    if (!("id" in document) || !document.id) {
       await this.uploadDBCollectionEntry(`${id}/`);
     } else {
       id = document.id;
