@@ -26,11 +26,6 @@ jobs:
           node-version: 20
           registry-url: "https://registry.npmjs.org"
 
-      - name: Test package
-        run: |
-          pnpm install --frozen-lockfile
-          # TODO: pnpm test
-
       - name: Assign a new stable version from release tag version
         # no need git tag version change because it is created before this action starts
         run: npm version ${{ github.event.release.tag_name }} --no-git-tag-version

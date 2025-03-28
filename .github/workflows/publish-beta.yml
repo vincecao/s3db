@@ -28,11 +28,6 @@ jobs:
           node-version: 20
           registry-url: "https://registry.npmjs.org"
 
-      - name: Test package
-        run: |
-          pnpm install --frozen-lockfile
-          # TODO: pnpm test
-
       - name: Assign a new beta version from current package version
         run: |
           npm version preminor --preid=beta -m "chore(ci): v%s"
