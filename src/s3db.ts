@@ -1,78 +1,100 @@
-import { GetObjectCommand, ListBucketsOutput, ListObjectsV2CommandInput, S3, S3ClientConfig } from "@aws-sdk/client-s3";
+import {
+  GetObjectCommand,
+  ListBucketsOutput,
+  ListObjectsV2CommandInput,
+  S3,
+  S3ClientConfig,
+} from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import type { Readable } from "stream";
 import invariant from "tiny-invariant";
 import { v4 as uuid } from "uuid";
-import type { Readable } from "stream";
 
-export function getS3dbConfigFromEnv({ awsRegion, awsAccessKeyId, awsSecretAccessKey }: { awsRegion?: string; awsAccessKeyId?: string; awsSecretAccessKey?: string }): S3ClientConfig {
-  invariant(awsRegion && awsAccessKeyId && awsSecretAccessKey, "Invalid aws credentials");
-  return {
-    region: awsRegion,
-    credentials: {
-      accessKeyId: awsAccessKeyId,
-      secretAccessKey: awsSecretAccessKey,
-    },
-  };
-}
+import type { S3dbDocument } from "./type";
+import { streamToString } from "./util";
 
-// https://arunrajeevan.medium.com/read-json-file-from-s3-using-v3-aws-sdk-fb0f5994a65d
-const streamToString = (stream: Readable) =>
-  new Promise((resolve, reject) => {
-    const chunks: any[] = [];
-    stream.on("data", (chunk) => chunks.push(chunk));
-    stream.on("error", reject);
-    stream.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
-  });
-
-type S3dbDocument<T> = {
-  id: string;
-  order: number;
-} & T;
-
+/**
+ * S3db is a class that extends the S3 client from the AWS SDK, providing
+ * an interface for interacting with an S3 with CRUD operations.
+ */
 export class S3db<T extends object> extends S3 {
   private bucketName: string | undefined;
   private collectionName: string | undefined;
 
-  static async initialize({ s3ClientConfig, bucketName, collectionName }: { s3ClientConfig: S3ClientConfig; bucketName: string; collectionName: string }) {
+  static async initialize(args: {
+    s3ClientConfig: S3ClientConfig;
+    bucketName: string;
+    collectionName: string;
+  }) {
+    const { s3ClientConfig, bucketName, collectionName } = args;
     const db = new this(s3ClientConfig);
     const buckets = await db.getDBBuckets();
-    console.info("constructor - buckets", JSON.stringify(buckets, null, 4));
+
+    console.info(`S3db Initialization - Bucket: <${bucketName}>`);
     const isBucketInS3 = !!buckets.find(({ Name }) => Name === bucketName);
-    invariant(isBucketInS3, "Invalid bucketName in S3");
+    if (!isBucketInS3) {
+      console.info("S3db Initialization - Creating bucket");
+      await db.createBucket({ Bucket: bucketName });
+      console.info("S3db Initialization - Created bucket");
+    } else {
+      console.info("S3db Initialization - Retrieved bucket");
+    }
     db.bucketName = bucketName;
 
     const collectionNames = await db.getDBCollectionNames();
-    console.info("constructor - collectionNames", JSON.stringify(collectionNames, null, 4));
-    const isCollectionInBucket = !!collectionNames.find((name) => name === collectionName);
-    invariant(isCollectionInBucket, "Invalid collection in current bucket");
+    console.info(`S3db Initialization - Collection: <${bucketName}>`);
+    const isCollectionInBucket = !!collectionNames.find(
+      (name) => name === collectionName
+    );
+    if (!isCollectionInBucket) {
+      console.info("S3db Initialization - Creating collection folder");
+      await db.putObject({ Bucket: db.bucketName, Key: `${collectionName}/` });
+      console.info("S3db Initialization - Created collection folder");
+    }
     db.collectionName = collectionName;
     return db;
   }
 
-  private async getDBBuckets(): Promise<NonNullable<ListBucketsOutput["Buckets"]>> {
+  // Retrieves the list of S3 buckets.
+  private async getDBBuckets(): Promise<
+    NonNullable<ListBucketsOutput["Buckets"]>
+  > {
     const { Buckets } = await this.listBuckets({});
     return Buckets || [];
   }
 
+  // Retrieves the names of collections in the S3 database.
   private async getDBCollectionNames(): Promise<string[]> {
     const { folderNames } = await this.getDBEntries();
     return folderNames;
   }
 
+  // Retrieves the document IDs from the current collection.
   async getDBDocumentIds(): Promise<string[]> {
     invariant(this.collectionName, "Invalid collectionName");
-    const { folderNames: ids } = await this.getDBEntries(`${this.collectionName}/`);
+    const { folderNames: ids } = await this.getDBEntries(
+      `${this.collectionName}/`
+    );
     return ids;
   }
 
-  private async getDBEntries(prefix?: ListObjectsV2CommandInput["Prefix"]): Promise<{ folderNames: string[]; objects: { name: string; lastModified: Date }[] }> {
+  // Retrieves entries from the S3 bucket, including folder names and object details.
+  private async getDBEntries(
+    prefix?: ListObjectsV2CommandInput["Prefix"]
+  ): Promise<{
+    folderNames: string[];
+    objects: { name: string; lastModified: Date }[];
+  }> {
     invariant(this.bucketName, "Invalid bucketName");
     const result = await this.listObjectsV2({
       Bucket: this.bucketName,
       Prefix: prefix,
       Delimiter: "/",
     });
-    console.info("getDBEntries - listObjectsV2", JSON.stringify(result, null, 4));
+    console.info(
+      "getDBEntries - listObjectsV2",
+      JSON.stringify(result, null, 4)
+    );
     const { Contents, CommonPrefixes } = result;
     const matchObjects: { name: string; lastModified: Date }[] = [];
     if (Contents) {
@@ -84,12 +106,14 @@ export class S3db<T extends object> extends S3 {
     const matchFolders = new Set<string>();
     if (CommonPrefixes) {
       for (const { Prefix } of CommonPrefixes) {
-        if (Prefix) matchFolders.add(Prefix.replace(prefix || "", "").split("/")[0]);
+        if (Prefix)
+          matchFolders.add(Prefix.replace(prefix || "", "").split("/")[0]);
       }
     }
     return { folderNames: [...matchFolders], objects: matchObjects };
   }
 
+  // Retrieves a single entry from the S3 bucket based on the provided key.
   private async getDBEntry<EntryType>(Key: string): Promise<EntryType> {
     invariant(this.bucketName, "Invalid bucketName");
     const { Body } = await this.getObject({
@@ -97,39 +121,63 @@ export class S3db<T extends object> extends S3 {
       Key,
     });
     invariant(Body, "Invalid Body from getDBEntry");
-    return JSON.parse((await streamToString(Body as Readable)) as string) as EntryType;
+    return JSON.parse(
+      (await streamToString(Body as Readable)) as string
+    ) as EntryType;
   }
 
-  private getDBCollectionEntries(prefixInCollection: string): Promise<{ folderNames: string[]; objects: { name: string; lastModified: Date }[] }> {
+  // Retrieves collection entries from the S3 bucket based on the specified prefix.
+  private getDBCollectionEntries(prefixInCollection: string): Promise<{
+    folderNames: string[];
+    objects: { name: string; lastModified: Date }[];
+  }> {
     invariant(this.collectionName, "Invalid collectionName");
     return this.getDBEntries(`${this.collectionName}/${prefixInCollection}`);
   }
 
-  private getDBCollectionEntry<EntryType>(keyInCollection: string): Promise<EntryType> {
+  // Retrieves a single collection entry based on the specified key.
+  private getDBCollectionEntry<EntryType>(
+    keyInCollection: string
+  ): Promise<EntryType> {
     invariant(this.collectionName, "Invalid collectionName");
-    return this.getDBEntry<EntryType>(`${this.collectionName}/${keyInCollection}`);
+    return this.getDBEntry<EntryType>(
+      `${this.collectionName}/${keyInCollection}`
+    );
   }
 
+  /** @todo Improve db with auto modified timestamp */
   /**
   uploadEmptyDBDocumentLastModified(): Promise<void> {
     invariant(this.collectionName, "Invalid collectionName");
     return this.uploadDBCollectionEntry(`lastModified.json`, "[]");
   }
+  */
 
+  /** @todo Improve db with auto modified timestamp */
+  /**
   getDBDocumentLastModified(): Promise<{ id: string; lastModified: Date }[]> {
     invariant(this.collectionName, "Invalid collectionName");
-    return this.getDBCollectionEntry<{ id: string; lastModified: Date }[]>(`lastModified.json`);
+    return this.getDBCollectionEntry<{ id: string; lastModified: Date }[]>(
+      `lastModified.json`
+    );
   }
   */
 
+  // Retrieves the document data for a given ID.
   async getDBDocumentData(id: S3dbDocument<T>["id"]): Promise<S3dbDocument<T>> {
     return this.getDBCollectionEntry<S3dbDocument<T>>(`${id}/data.json`);
   }
 
-  async getDBDocumentMedia(id: S3dbDocument<T>["id"]): Promise<{ name: string; lastModified: Date }[]> {
-    return (await this.getDBCollectionEntries(`${id}`)).objects.filter(({ name }) => name !== "data.json");
+  // Retrieves media associated with a document for a given ID.
+  async getDBDocumentMedia(
+    id: S3dbDocument<T>["id"]
+  ): Promise<{ name: string; lastModified: Date }[]> {
+    return (await this.getDBCollectionEntries(`${id}`)).objects.filter(
+      ({ name }) => name !== "data.json"
+    );
   }
 
+  // Generates a signed URL for accessing the document data for a given ID.
   getDBDocumentUrl(id: S3dbDocument<T>["id"]): Promise<string> {
     invariant(this.bucketName, "Invalid bucketName");
     return getSignedUrl(
@@ -141,7 +189,11 @@ export class S3db<T extends object> extends S3 {
     );
   }
 
-  private async uploadDBCollectionEntry(keyInCollection: string, Body?: string): Promise<void> {
+  // Uploads a collection entry to the S3 bucket.
+  private async uploadDBCollectionEntry(
+    keyInCollection: string,
+    Body?: string
+  ): Promise<void> {
     invariant(this.bucketName, "Invalid bucketName");
     invariant(this.collectionName, "Invalid collectionName");
     await this.putObject({
@@ -151,7 +203,11 @@ export class S3db<T extends object> extends S3 {
     });
   }
 
-  private async uploadDBCollectionMedia(keyInCollection: string, file: File): Promise<void> {
+  // Uploads media to the S3 bucket for a specific collection entry.
+  private async uploadDBCollectionMedia(
+    keyInCollection: string,
+    file: File
+  ): Promise<void> {
     invariant(this.bucketName, "Invalid bucketName");
     invariant(this.collectionName, "Invalid collectionName");
     await this.putObject({
@@ -162,13 +218,18 @@ export class S3db<T extends object> extends S3 {
     });
   }
 
-  async uploadDBDocumentWithMedia(document: T | S3dbDocument<T>, media: File[]): Promise<string> {
+  // Uploads a document along with its media files.
+  async uploadDBDocumentWithMedia(
+    document: T | S3dbDocument<T>,
+    media: File[]
+  ): Promise<string> {
     invariant(this.collectionName, "Invalid collectionName");
     const id = await this.uploadDBDocument(document);
     await this.uploadDBDocumentMedia(id, media);
     return id;
   }
 
+  // Uploads a document to the S3 bucket and returns its ID.
   async uploadDBDocument(document: T | S3dbDocument<T>): Promise<string> {
     let id = uuid();
     if (!("id" in document) || !document.id) {
@@ -176,15 +237,24 @@ export class S3db<T extends object> extends S3 {
     } else {
       id = document.id;
     }
-    await this.uploadDBCollectionEntry(`${id}/data.json`, JSON.stringify({ ...document, id }, null, 4));
+    await this.uploadDBCollectionEntry(
+      `${id}/data.json`,
+      JSON.stringify({ ...document, id }, null, 4)
+    );
     // todo: update lastModified.json
     return id;
   }
 
+  // Uploads media files associated with a document.
   async uploadDBDocumentMedia(id: string, media: File[]): Promise<void> {
-    await Promise.all(media.map((file) => this.uploadDBCollectionMedia(`${id}/${file.name}`, file)));
+    await Promise.all(
+      media.map((file) =>
+        this.uploadDBCollectionMedia(`${id}/${file.name}`, file)
+      )
+    );
   }
 
+  // Deletes a document and its associated media by ID.
   async deleteDBDocumentById(id: S3dbDocument<T>["id"]): Promise<void> {
     invariant(this.bucketName, "Invalid bucketName");
     invariant(this.collectionName, "Invalid collectionName");
@@ -193,19 +263,30 @@ export class S3db<T extends object> extends S3 {
       Prefix: `${this.collectionName}/${id}/`,
     });
     const objects = Contents?.map((obj) => ({ Key: obj.Key! }));
-    invariant(objects && objects.length > 0, `No objects found in the id<${id}>. Nothing to delete.`);
+    invariant(
+      objects && objects.length > 0,
+      `No objects found in the id<${id}>. Nothing to delete.`
+    );
     await this.deleteObjects({
       Bucket: this.bucketName,
       Delete: { Objects: objects },
     });
   }
 
-  async deleteDBDocumentMedia(id: S3dbDocument<T>["id"], mediaNames: string[]): Promise<void> {
+  // Deletes specified media files associated with a document by ID.
+  async deleteDBDocumentMedia(
+    id: S3dbDocument<T>["id"],
+    mediaNames: string[]
+  ): Promise<void> {
     invariant(this.bucketName, "Invalid bucketName");
     invariant(this.collectionName, "Invalid collectionName");
     await this.deleteObjects({
       Bucket: this.bucketName,
-      Delete: { Objects: mediaNames.map((mediaName) => ({ Key: `${this.collectionName}/${id}/${mediaName}` })) },
+      Delete: {
+        Objects: mediaNames.map((mediaName) => ({
+          Key: `${this.collectionName}/${id}/${mediaName}`,
+        })),
+      },
     });
   }
 }
