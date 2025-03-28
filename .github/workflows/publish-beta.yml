@@ -12,6 +12,10 @@ jobs:
     if: ${{ github.event.pull_request.merged }}
     runs-on: ubuntu-latest
     steps:
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
       - uses: actions/checkout@v3
         with:
           # Allow push from action in PAT trigger an action
@@ -27,6 +31,11 @@ jobs:
         with:
           node-version: 20
           registry-url: "https://registry.npmjs.org"
+
+      - name: Install dependencies and test package
+        run: |
+          pnpm install --frozen-lockfile
+          # TODO: pnpm test
 
       - name: Assign a new beta version from current package version
         run: |
