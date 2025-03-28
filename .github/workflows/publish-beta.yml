@@ -12,6 +12,10 @@ jobs:
     if: ${{ github.event.pull_request.merged }}
     runs-on: ubuntu-latest
     steps:
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
       - uses: actions/checkout@v3
         with:
           # Allow push from action in PAT trigger an action
@@ -28,14 +32,14 @@ jobs:
           node-version: 20
           registry-url: "https://registry.npmjs.org"
 
-      - name: Test package
+      - name: Install dependencies and test package
         run: |
           pnpm install --frozen-lockfile
           # TODO: pnpm test
 
       - name: Assign a new beta version from current package version
         run: |
-          npm version preminor --preid=beta -m "chore(ci): v%s"
+          npm version preminor --preid=pre -m "chore(ci): v%s"
 
       - name: Publish beta to NPMJS
         run: npm publish --tag beta
@@ -49,8 +53,7 @@ jobs:
           registry-url: https://npm.pkg.github.com/
           scope: "vincecao"
 
-      - name: Publish beta to GITHUB
-        run: npm publish --tag beta
+      - run: npm publish --tag beta
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
