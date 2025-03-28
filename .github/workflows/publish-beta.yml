@@ -1,6 +1,9 @@
 name: Beta Publish
 
 on:
+  push:
+    branches:
+      - master
   pull_request:
     branches:
       - master
@@ -39,7 +42,7 @@ jobs:
 
       - name: Assign a new beta version from current package version
         run: |
-          npm version preminor --preid=beta -m "chore(ci): v%s"
+          npm version preminor --preid=pre -m "chore(ci): v%s"
 
       - name: Publish beta to NPMJS
         run: npm publish --tag beta
