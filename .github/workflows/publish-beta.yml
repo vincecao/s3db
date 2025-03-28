@@ -53,8 +53,7 @@ jobs:
           registry-url: https://npm.pkg.github.com/
           scope: "vincecao"
 
-      - name: Publish beta to GITHUB
-        run: npm publish --tag beta
+      - run: npm publish --tag beta
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
