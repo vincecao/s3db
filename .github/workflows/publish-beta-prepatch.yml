@@ -9,10 +9,7 @@ on:
 jobs:
   # When a new PR is merged to master branch, a beta version will be published
   publish-patch:
-    if: >
-      ${{ github.event.pull_request.merged &&
-        (startsWith(github.event.pull_request.title, 'fix:') ||
-          startsWith(github.event.pull_request.title, 'patch:')) }}
+    if: github.event.pull_request.merged == true && (startsWith(github.event.pull_request.title, 'fix:') || startsWith(github.event.pull_request.title, 'patch:'))
     runs-on: ubuntu-latest
     steps:
       - uses: pnpm/action-setup@v4
