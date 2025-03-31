@@ -10,7 +10,7 @@ jobs:
   # When a new PR is merged to master branch, a beta version will be published
   publish-beta:
     if: > 
-      if: github.event.pull_request.merged == true && startsWith(github.event.pull_request.title, 'feat:'))
+      if: github.event.pull_request.merged == true && startsWith(github.event.pull_request.title, 'feat:')
     runs-on: ubuntu-latest
     steps:
       - uses: pnpm/action-setup@v4
