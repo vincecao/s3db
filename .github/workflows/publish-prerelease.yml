@@ -1,15 +1,13 @@
 name: Prerelease Publish
 
 on:
-  pull_request:
+  push:
     branches:
       - master
-    types: [closed]
 
 jobs:
-  # When a new PR is merged to master branch, a beta version will be published
-  publish-patch:
-    if: github.event.pull_request.merged == true
+  # When a commit is pushed to master branch, a beta version will be published
+  publish-prerelease:
     runs-on: ubuntu-latest
     steps:
       - uses: pnpm/action-setup@v4

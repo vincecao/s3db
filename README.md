@@ -1,16 +1,15 @@
 # S3DB - Simple S3 Database
 
+[![npm version](https://badge.fury.io/js/@vincecao%2Fs3db.svg)](https://badge.fury.io/js/@vincecao%2Fs3db)
+[![npm checks](https://badgen.net/github/checks/vincecao/s3db)](https://github.com/vincecao/s3db/actions)
+
 Transform AWS S3 into a simple document database that offers scalable storage for JSON-like documents.
 
 While S3 is suitable for certain use cases, it's important to consider whether it meets the needs of your application compared to traditional document databases. This library can be beneficial for scenarios like content management systems and web applications, but keep in mind that S3 is primarily an object storage service, which may not provide the same level of querying capabilities and performance as a dedicated document database.
 
 Use this library for managing collections of documents with CRUD operations efficiently, but evaluate your requirements carefully to ensure S3 is the right choice for your data storage needs.
 
-[![npm version](https://badge.fury.io/js/@vincecao%2Fs3db.svg)](https://badge.fury.io/js/@vincecao%2Fs3db)
-[![npm checks](https://badgen.net/github/checks/vincecao/s3db)](https://github.com/vincecao/s3db/actions)
-
 ## Installation
-
 This package is automatically published in both [NPMJS](https://www.npmjs.com/package/@vincecao/s3db) and [GITHUB](https://github.com/vincecao/s3db/pkgs/npm/s3db) npm registry.
 
 ```bash
