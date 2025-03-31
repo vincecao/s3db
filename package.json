@@ -1,6 +1,6 @@
 {
   "name": "@vincecao/s3db",
-  "version": "0.1.4-pre.9",
+  "version": "0.1.4-pre.10",
   "description": "Transform AWS S3 into a simple, scalable document database for efficient storage and retrieval of JSON-like documents.",
   "source": "src/index.ts",
   "main": "dist/main.js",
