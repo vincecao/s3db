@@ -1,4 +1,4 @@
-name: Beta Publish
+name: Prepatch Publish
 
 on:
   pull_request:
@@ -8,8 +8,11 @@ on:
 
 jobs:
   # When a new PR is merged to master branch, a beta version will be published
-  publish-beta:
-    if: ${{ github.event.pull_request.merged }}
+  publish-patch:
+    if: >
+      ${{ github.event.pull_request.merged &&
+        (startsWith(github.event.pull_request.title, 'fix:') ||
+          startsWith(github.event.pull_request.title, 'patch:')) }}
     runs-on: ubuntu-latest
     steps:
       - uses: pnpm/action-setup@v4
@@ -39,7 +42,7 @@ jobs:
 
       - name: Assign a new beta version from current package version
         run: |
-          npm version preminor --preid=pre -m "chore(ci): v%s"
+          npm version prepatch --preid=pre -m "chore(ci): v%s"
 
       - name: Publish beta to NPMJS
         run: npm publish --tag beta
